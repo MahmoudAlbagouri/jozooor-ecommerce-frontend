@@ -1,8 +1,8 @@
+// stores/wishlist.js
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 
 export const useWishlistStore = defineStore("wishlist", () => {
-  // ✅ useApi في أعلى الـ setup — نفس الطريقة في cart store
   const api = useApi();
 
   const items = ref([]);
@@ -18,7 +18,6 @@ export const useWishlistStore = defineStore("wishlist", () => {
   const fetchWishlist = async () => {
     loading.value = true;
     try {
-      // ✅ useApi بيضيف lang=locale.value تلقائياً في كل request
       const response = await api("/wishlist");
       if (response.success) {
         items.value = response.data;

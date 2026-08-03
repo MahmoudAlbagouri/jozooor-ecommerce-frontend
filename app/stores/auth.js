@@ -46,7 +46,7 @@ export const useAuthStore = defineStore("auth", {
       }
     },
 
-    // ✅ تسجيل حساب جديد - الدالة المفقودة
+    // ✅ تسجيل حساب جديد
     async register(userData) {
       const config = useRuntimeConfig();
       try {
@@ -68,7 +68,6 @@ export const useAuthStore = defineStore("auth", {
         );
 
         if (response.success) {
-          // حفظ البيانات وتوجيه المستخدم
           this.saveAuthData(response.data);
           return { success: true };
         }
@@ -87,18 +86,20 @@ export const useAuthStore = defineStore("auth", {
 
     // ✅ حفظ بيانات المصادقة
     saveAuthData(data) {
+      const isProd = !process.dev;
+
       const tokenCookie = useCookie("auth_token", {
         maxAge: 60 * 60 * 24 * 7,
         sameSite: "lax",
         path: "/",
-        secure: process.env.NODE_ENV === "production",
+        secure: isProd,
       });
 
       const refreshCookie = useCookie("refresh_token", {
         maxAge: 60 * 60 * 24 * 30,
         sameSite: "lax",
         path: "/",
-        secure: process.env.NODE_ENV === "production",
+        secure: isProd,
       });
 
       tokenCookie.value = data.access_token;
@@ -112,16 +113,15 @@ export const useAuthStore = defineStore("auth", {
 
     // ✅ تحديث التوكن
     async refreshAccessToken() {
-      // ✅ 1. إدارة الطابور عند وجود طلب تجديد قيد التنفيذ حالياً
       if (this.isRefreshing) {
         return new Promise((resolve) => {
           const checkInterval = setInterval(() => {
             if (!this.isRefreshing && this.token) {
               clearInterval(checkInterval);
-              resolve(true); // نجح التجديد في الطلب الموازي، اسمح للطلب الحالي بإعادة المحاولة
+              resolve(true);
             } else if (!this.isRefreshing && !this.token) {
               clearInterval(checkInterval);
-              resolve(false); // فشل التجديد في الطلب الموازي
+              resolve(false);
             }
           }, 100);
         });
@@ -130,7 +130,6 @@ export const useAuthStore = defineStore("auth", {
       const refreshCookie = useCookie("refresh_token");
       const currentRefreshToken = refreshCookie.value;
 
-      // إذا لم يكن هناك refresh token مخزن، نظف الذاكرة واخرج فوراً
       if (!currentRefreshToken) {
         this.clearAuth();
         return false;
@@ -140,7 +139,6 @@ export const useAuthStore = defineStore("auth", {
       const config = useRuntimeConfig();
 
       try {
-        // 2️⃣ طلب التجديد من الباك إند
         const response = await $fetch(
           `${config.public.apiBase}/auth/refresh-token`,
           {
@@ -152,16 +150,14 @@ export const useAuthStore = defineStore("auth", {
           },
         );
 
-        // 3️⃣ التحقق من مطابقة هيكل الـ JSON الراجع من السيرفر
         if (response?.success && response?.data?.access_token) {
           const newAccessToken = response.data.access_token;
           const newRefreshToken =
             response.data.refresh_token || currentRefreshToken;
           const newUser = response.data.user;
 
-          const isProd = !process.dev; // طريقة أدق ومتوافقة تماماً مع Nuxt 3 بدلاً من process.env
+          const isProd = !process.dev;
 
-          // إعداد الكوكيز لفترة الصلاحية الجديدة
           const tokenCookie = useCookie("auth_token", {
             maxAge: 60 * 60 * 24 * 7,
             sameSite: "lax",
@@ -176,36 +172,30 @@ export const useAuthStore = defineStore("auth", {
             secure: isProd,
           });
 
-          // حفظ القيم الجديدة في الكوكيز
           tokenCookie.value = newAccessToken;
           newRefreshCookie.value = newRefreshToken;
 
-          // 4️⃣ تحديث حالة الـ Store لتصبح متاحة فوراً للـ Interceptor والـ Components
           this.token = newAccessToken;
           this.refreshToken = newRefreshToken;
           if (newUser) this.user = newUser;
 
-          // 🔥 خطوة حاسمة: نقوم بتغيير حالة العلم (Flag) قبل إرجاع النتيجة
-          // حتى لا تقع دالة الـ setInterval للطلبات الأخرى في حلقة تكرار معلقة
           this.isRefreshing = false;
-
-          return true; // 🌟 إرجاع true للـ Interceptor ليعيد إرسال البيانات فوراً
+          return true;
         } else {
           throw new Error("فشل تحديث التوكن: بنية البيانات الراجعة غير صالحة");
         }
       } catch (error) {
         console.error("🚨 Refresh Token Failed:", error);
-
-        // 5️⃣ التعامل الآمن مع الفشل الكلي للتجديد
         this.isRefreshing = false;
         this.clearAuth();
 
         if (process.client) {
           navigateTo("/login");
         }
-        return false; // 🌟 إرجاع false ليقوم الـ Interceptor بإيقاف العملية وتوجيه المستخدم
+        return false;
       }
     },
+
     // ✅ تهيئة حالة المستخدم
     async fetchUserProfile() {
       const tokenCookie = useCookie("auth_token");
@@ -217,9 +207,19 @@ export const useAuthStore = defineStore("auth", {
           this.refreshToken = refreshCookie.value;
         }
       } else {
-        this.clearAuth();
+        // 🔑 استخدم التنظيف الصامت بدلاً من clearAuth العادي
+        // لتجنب إعادة التوجيه المفاجئة أثناء التهيئة
+        this.clearAuthSilent();
         return;
       }
+
+      // هنا يمكنك إضافة طلب جلب البروفايل من الـ API إذا أردت
+      // const config = useRuntimeConfig();
+      // const response = await $fetch(`${config.public.apiBase}/user/profile`, {
+      //   headers: { Authorization: `Bearer ${this.token}` }
+      // });
+      // if (response.success) this.user = response.data;
+
       this.initialized = true;
     },
 
@@ -229,7 +229,7 @@ export const useAuthStore = defineStore("auth", {
       navigateTo("/");
     },
 
-    // ✅ مسح بيانات المصادقة
+    // ✅ مسح بيانات المصادقة (مع إعادة توجيه)
     clearAuth() {
       this.user = null;
       this.token = null;
@@ -241,8 +241,22 @@ export const useAuthStore = defineStore("auth", {
       useCookie("refresh_token").value = null;
 
       if (process.client) {
-        window.location.href = "/";
+        navigateTo("/");
       }
+    },
+
+    // ✅ مسح بيانات المصادقة بصمت (بدون إعادة توجيه)
+    // يُستخدم فقط عند فشل التهيئة الأولية لتجنب Loop بين /login و /
+    clearAuthSilent() {
+      this.user = null;
+      this.token = null;
+      this.refreshToken = null;
+      this.isRefreshing = false;
+      // ❌ لا تغير initialized هنا — الـ Plugin سيتولى ضبطها في finally
+      // ❌ لا تقم بـ navigateTo أو window.location هنا
+
+      useCookie("auth_token").value = null;
+      useCookie("refresh_token").value = null;
     },
 
     // ✅ تهيئة المصادقة عند تحميل التطبيق

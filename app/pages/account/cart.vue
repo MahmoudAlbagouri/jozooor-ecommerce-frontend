@@ -144,7 +144,15 @@ import { useCartStore } from "@/stores/cart";
 import AccountSidebar from "@/components/base/AccountSidebar.vue";
 import QuantityInput from "@/components/base/QuantityInput.vue";
 
-definePageMeta({ middleware: ["auth"] });
+definePageMeta({
+  middleware: ["guest"],
+  requiresAuth: true,
+});
+
+useSeoMeta({
+  title: "سلة المشتريات | متجر جذور",
+  description: "راجع المنتجات في سلتك وأتمم عملية الشراء بسهولة وأمان.",
+});
 
 const cartStore = useCartStore();
 onMounted(() => cartStore.fetchCart());

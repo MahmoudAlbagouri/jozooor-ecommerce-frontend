@@ -1,24 +1,19 @@
+// stores/cart.js
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 
 export const useCartStore = defineStore("cart", () => {
-  // ✅ useApi هنا في أعلى الـ setup — مرة واحدة بس
-  // وده صح لأن defineStore مع setup function بيتنفذ جوه Nuxt context
   const api = useApi();
 
-  // --- State ---
   const items = ref([]);
   const total = ref(0);
   const loading = ref(false);
   const error = ref(null);
 
-  // --- Getters ---
   const cartItemsCount = computed(() => items.value.length);
   const totalQuantity = computed(() =>
     items.value.reduce((acc, item) => acc + item.quantity, 0),
   );
-
-  // --- Actions ---
 
   const fetchCart = async () => {
     loading.value = true;
@@ -39,7 +34,6 @@ export const useCartStore = defineStore("cart", () => {
   const addToCart = async (productId, quantity = 1, variantId = null) => {
     loading.value = true;
 
-    // Optimistic update
     const tempId = `temp-${Date.now()}`;
     const existingItem = items.value.find(
       (i) => i.productId === productId || i.product?.id === productId,
@@ -62,7 +56,6 @@ export const useCartStore = defineStore("cart", () => {
         return { success: true, message: response.message };
       }
     } catch (err) {
-      // Rollback
       items.value = items.value.filter((i) => i.id !== tempId);
       if (existingItem) existingItem.quantity -= quantity;
       console.error("Add to Cart Error:", err);

@@ -69,7 +69,15 @@ import { useWishlistStore } from "@/stores/wishlist";
 import ProductCard from "@/components/global/ProductCard.vue";
 import AccountSidebar from "@/components/base/AccountSidebar.vue";
 
-definePageMeta({ middleware: ["auth"] });
+definePageMeta({
+  middleware: ["guest"],
+  requiresAuth: true,
+});
+
+useSeoMeta({
+  title: "قائمة المفضلة | متجر جذور",
+  description: "راجع المنتجات في قائمة أمنياتك وأضفها إلى سلتك بسهولة.",
+});
 
 const wishlistStore = useWishlistStore();
 const { currentLang } = useLanguage();
