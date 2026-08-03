@@ -69,20 +69,17 @@ export const useProductsStore = defineStore("products", () => {
     loading.value = true;
     error.value = null;
     try {
-      // دمج الـ activeFilters مع الـ params المررة
       const mergedParams = {
         ...activeFilters.value,
         ...params,
       };
 
-      // حذف القيم الفارغة قبل الإرسال
       const cleanParams = Object.fromEntries(
         Object.entries(mergedParams).filter(
           ([_, v]) => v !== "" && v !== null && v !== undefined,
         ),
       );
 
-      // تحديث activeFilters بالـ params الجديدة
       if (params.page !== undefined) activeFilters.value.page = params.page;
 
       const response = await api("/products", { params: cleanParams });
@@ -99,8 +96,39 @@ export const useProductsStore = defineStore("products", () => {
     }
   }
 
+  // ✅ بحث عام — لا يحتاج تسجيل دخول
+  // يستخدم endpoint /products/search?q= مباشرة عبر $fetch
+  async function searchProducts(term, limit = 6) {
+    try {
+      const config = useRuntimeConfig();
+      const nuxtApp = useNuxtApp();
+      const currentLocale =
+        nuxtApp.$i18n?.locale?.value || locale.value || "ar";
+
+      const response = await $fetch("/products/search", {
+        baseURL: config.public.apiBase,
+        params: { q: term },
+        headers: {
+          "Accept-Language": currentLocale,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (response.success) {
+        const data = response.data || [];
+        return {
+          data: data.slice(0, limit),
+          total: data.length,
+        };
+      }
+      return { data: [], total: 0 };
+    } catch (err) {
+      console.error("searchProducts error:", err);
+      return { data: [], total: 0 };
+    }
+  }
+
   async function applyFilters(newFilters = {}) {
-    // تحديث الـ filters وإعادة الصفحة للأولى
     Object.assign(activeFilters.value, newFilters, { page: 1 });
     await fetchProducts();
   }
@@ -220,6 +248,7 @@ export const useProductsStore = defineStore("products", () => {
     getProductPrice,
     getDiscountPercent,
     fetchProducts,
+    searchProducts,
     applyFilters,
     resetFilters,
     fetchProduct,
